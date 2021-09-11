@@ -4,6 +4,9 @@ import maya.cmds as cmds
 import math
 import traceback
 
+import nnutil.ui as ui
+reload(ui)
+
 
 # vertex から point 取得
 def pointFromVertex(vtx):
@@ -62,9 +65,13 @@ class NN_AlignedgeRingWindow(object):
         self.title = 'Align EdgeRing'
         self.size = (350, 95)
 
+        self.absolute_mode_components = []
+        self.relative_mode_components = []
+
     def create(self):
         if cmds.window('NN_AlignedgeRingWindow', exists=True):
             cmds.deleteUI('NN_AlignedgeRingWindow', window=True)
+
         self.window = cmds.window(
             self.window,
             t=self.title,
@@ -74,91 +81,105 @@ class NN_AlignedgeRingWindow(object):
         cmds.showWindow()
 
     def layout(self):
-        self.columnLayout = cmds.columnLayout()
+        ui.column_layout()
 
-        self.rowLayout1 = cmds.rowLayout(numberOfColumns=6)
-        self.label1 = cmds.text(label='length1:')
-        self.buttonA = cmds.button(l='-', c=self.onDecreaseLength1)
-        self.field_length1 = cmds.floatField(v=0.1, dc=self.onChangeLength1)
-        self.buttonA = cmds.button(l='+', c=self.onIncreaseLength1)
-        self.buttonA = cmds.button(l='<=', c=self.onConstantLength1)
-        self.buttonA = cmds.button(l='swap', c=self.onSwapLength)
-        cmds.setParent("..")
+        # 絶対モード
+        ui.row_layout()
+        ui.header(label="Absolute")
+        ui.end_layout()
 
-        self.rowLayout1 = cmds.rowLayout(numberOfColumns=6)
-        self.label1 = cmds.text(label='length2:')
-        self.buttonA = cmds.button(l='-', c=self.onDecreaseLength2)
-        self.field_length2 = cmds.floatField(v=0.1, en=False, dc=self.onChangeLength2)
-        self.buttonA = cmds.button(l='+', c=self.onIncreaseLength2)
-        self.buttonA = cmds.button(l='<=', c=self.onConstantLength2)
-        self.constMode = cmds.checkBox(l='const', v=True, cc=self.onSetConst)
-        cmds.setParent("..")
+        ui.row_layout()
+        ui.header(label='width1:')
+        ui.button(label='-', c=self.onDecreaseLength1)
+        self.field_length1 = ui.float(v=0.1, dc=self.onChangeLength1)
+        ui.button(label='+', c=self.onIncreaseLength1)
+        ui.button(label='=2', c=self.onConstantLength1)
+        ui.button(label='swap', c=self.onSwapLength)
+        ui.end_layout()
 
-        cmds.separator(width=350)
+        ui.row_layout()
+        ui.header(label='width2:')
+        ui.button(label='-', c=self.onDecreaseLength2)
+        self.field_length2 = ui.float(v=0.1, en=False, dc=self.onChangeLength2)
+        ui.button(label='+', c=self.onIncreaseLength2)
+        ui.button(label='=1', c=self.onConstantLength2)
+        self.constMode = ui.check_box(label='const', v=True, cc=self.onSetConst)
+        ui.end_layout()
 
-        self.rowLayout1 = cmds.rowLayout(numberOfColumns=16)
-        self.label1 = cmds.text(label='relative:')
-        self.buttonA = cmds.button(l='/', c=self.onRelativeDiv)
-        self.rel_value2 = cmds.floatField(v=1.1)
-        self.buttonA = cmds.button(l='*', c=self.onRelativeMul)
-        self.buttonA = cmds.button(l='-', c=self.onRelativeDiff)
-        self.rel_value1 = cmds.floatField(v=0.1)
-        self.buttonA = cmds.button(l='+', c=self.onRelativeAdd)
-        cmds.setParent("..")
+        ui.separator()
 
-        self.rowLayout1 = cmds.rowLayout(numberOfColumns=16)
-        self.label1 = cmds.text(label='accumulation:')
-        self.label1 = cmds.text(label='x')
-        self.ff_acc_mul = cmds.floatField(v=1)
-        self.label1 = cmds.text(label='+')
-        self.ff_acc_add = cmds.floatField(v=0)
-        cmds.setParent("..")
+        # 相対モード
+        ui.row_layout()
+        ui.header(label="Relative")
+        ui.end_layout()
 
-        self.rowLayout1 = cmds.rowLayout(numberOfColumns=16)
-        self.buttonA = cmds.button(l='Relative Align', c=self.onRelativeAlign)
-        self.buttonA = cmds.button(l='Reset Accu', c=self.onResetAccumulation)
-        cmds.setParent("..")
+        ui.row_layout()
+        ui.button(label='-10%', c=self.onRelativeDiv_90)
+        ui.button(label='-1%', c=self.onRelativeDiv_99)
+        self.ff_acc_mul = ui.float(v=1)
+        ui.button(label='+1%', c=self.onRelativeMul_1)
+        ui.button(label='+10%', c=self.onRelativeMul_10)
+        ui.end_layout()
+  
+        ui.row_layout()
+        ui.button(label='-0.1', c=self.onRelativeDiff_10)
+        ui.button(label='-0.01', c=self.onRelativeDiff_1)
+        self.ff_acc_add = ui.float(v=0)
+        ui.button(label='+0.01', c=self.onRelativeAdd_1)
+        ui.button(label='+0.1', c=self.onRelativeAdd_10)
+        ui.end_layout()
 
-        cmds.separator(width=350)
+        ui.row_layout()
+        ui.button(label='Align', c=self.onAlignRelative)
+        ui.button(label='Reset', c=self.onResetAccumulation)
+        ui.end_layout()
 
-        self.rowLayout2 = cmds.rowLayout(numberOfColumns=1)
-        self.label1 = cmds.text(label='Set Length from ')
-        cmds.setParent("..")
+        ui.separator()
 
-        self.rowLayout2 = cmds.rowLayout(numberOfColumns=16)
-        self.buttonFirst = cmds.button(l='First', c=self.onSetLengthFromFirstEdge)
-        self.buttonLast = cmds.button(l='Last', c=self.onSetLengthFromLastEdge)
-        self.buttonMode = cmds.button(l='Mode', c=self.onSetLengthFromMode)
-        self.buttonPath = cmds.button(l='Path', c=self.onSetLengthFromEdgePath)
-        cmds.setParent("..")
+        # 取得系
+        ui.row_layout()
+        ui.header(label='Get from ')
+        ui.end_layout()
 
-        self.rowLayout2 = cmds.rowLayout(numberOfColumns=16)
-        self.buttonPath = cmds.button(l='Min', c=self.onSetLengthFromMin)
-        self.buttonPath = cmds.button(l='Max', c=self.onSetLengthFromMax)
-        self.buttonAverage = cmds.button(l='Average', c=self.onSetLengthFromAverage)
-        cmds.setParent("..")
+        ui.row_layout()
+        ui.button(label='First', c=self.onSetLengthFromFirstEdge)
+        ui.button(label='Last', c=self.onSetLengthFromLastEdge)
+        ui.button(label='Mode', c=self.onSetLengthFromMode)
+        ui.button(label='Path', c=self.onSetLengthFromEdgePath)
+        ui.end_layout()
 
-        cmds.separator(width=350)
+        ui.row_layout()
+        ui.button(label='Min', c=self.onSetLengthFromMin)
+        ui.button(label='Max', c=self.onSetLengthFromMax)
+        ui.button(label='Average', c=self.onSetLengthFromAverage)
+        ui.end_layout()
 
-        self.rowLayout2 = cmds.rowLayout(numberOfColumns=1)
-        self.label1 = cmds.text(label='Align [MMB: only set mode]')
-        cmds.setParent("..")
+        ui.separator()
 
-        self.rowLayout2 = cmds.rowLayout(numberOfColumns=4)
-        self.buttonA = cmds.button(l='In', c=self.onAlignIn, dgc=self.onAlignInOnlySetMode)
-        self.buttonB = cmds.button(l='Center', c=self.onAlignCenter, dgc=self.onAlignCenterOnlySetMode)
-        self.buttonC = cmds.button(l='Out', c=self.onAlignOut, dgc=self.onAlignOutOnlySetMode)
-        self.buttonD = cmds.button(l='Smooth', c=self.onSmoothAngle)
-        cmds.setParent("..")
+        # アライン
+        ui.row_layout()
+        ui.text(label='Align')
+        ui.text(label='[MMB: only set mode]')
+        ui.end_layout()
 
-        self.rowLayout2 = cmds.rowLayout(numberOfColumns=2)
-        self.buttonC = cmds.button(l='Reset', c=self.onReset)
-        self.buttonC = cmds.button(l='ClearCache', c=self.onClearCache)
-        cmds.setParent("..")
+        ui.row_layout()
+        self.cb_relative_mode = ui.check_box(label='Relative Align', v=False, cc=self.onRelativeAlign)
+        ui.end_layout()
 
-        self.rowLayout2 = cmds.rowLayout(numberOfColumns=1)
-        self.buttonC = cmds.button(l='Dump', c=self.onDump)
-        cmds.setParent("..")
+        ui.row_layout()
+        ui.button(label='In', c=self.onAlignIn, dgc=self.onAlignInOnlySetMode)
+        ui.button(label='Center', c=self.onAlignCenter, dgc=self.onAlignCenterOnlySetMode)
+        ui.button(label='Out', c=self.onAlignOut, dgc=self.onAlignOutOnlySetMode)
+        ui.button(label='Hilite Inner', c=self.onHiliteInner)
+        ui.end_layout()
+
+        # その他機能
+        ui.row_layout()
+        ui.button(label='Reset', c=self.onReset)
+        ui.button(label='ClearCache', c=self.onClearCache)
+        ui.button(label='Smooth', c=self.onSmoothAngle)
+        ui.end_layout()
+
 
     def onChangeLength1(self, *args):
         """値変更時のハンドラ"""
@@ -168,61 +189,71 @@ class NN_AlignedgeRingWindow(object):
         self.update()
 
     def onIncreaseLength1(self, *args):
-        """幅を増加させるボタン"""
+        """絶対モードの幅1を増加させる"""
         currentLength = cmds.floatField(self.field_length1, q=True, v=True)
         newLength = currentLength * 1.1
         cmds.floatField(self.field_length1, e=True, v=newLength)
+        ui.set_value(self.cb_relative_mode, False)
         self.update()
 
     def onIncreaseLength2(self, *args):
-        """幅を増加させるボタン"""
+        """絶対モードの幅1を増加させる"""
         currentLength = cmds.floatField(self.field_length2, q=True, v=True)
         newLength = currentLength * 1.1
         cmds.floatField(self.field_length2, e=True, v=newLength)
+        ui.set_value(self.cb_relative_mode, False)
         self.update()
 
     def onDecreaseLength1(self, *args):
-        """幅を減少させるボタン"""
+        """絶対モードの幅2を減少させる"""
         currentLength = cmds.floatField(self.field_length1, q=True, v=True)
         newLength = currentLength * 0.9
         cmds.floatField(self.field_length1, e=True, v=newLength)
+        ui.set_value(self.cb_relative_mode, False)
         self.update()
 
     def onDecreaseLength2(self, *args):
-        """幅を減少させるボタン"""
+        """絶対モードの幅2を減少させる"""
         currentLength = cmds.floatField(self.field_length2, q=True, v=True)
         newLength = currentLength * 0.9
         cmds.floatField(self.field_length2, e=True, v=newLength)
+        ui.set_value(self.cb_relative_mode, False)
         self.update()
 
     def onSwapLength(self, *args):
-        """幅の値を入れ替える"""
+        """絶対モードの幅の値を入れ替える"""
         length1 = cmds.floatField(self.field_length1, q=True, v=True)
         length2 = cmds.floatField(self.field_length2, q=True, v=True)
         cmds.floatField(self.field_length1, e=True, v=length2)
         cmds.floatField(self.field_length2, e=True, v=length1)
+        ui.set_value(self.cb_relative_mode, False)
         self.update()
 
     def onConstantLength1(self, *args):
-        """length2 の値を length1 に設定する"""
+        """絶対モードの幅を 幅2 で統一する"""
         length = cmds.floatField(self.field_length2, q=True, v=True)
         cmds.floatField(self.field_length1, e=True, v=length)
+        ui.set_value(self.cb_relative_mode, False)
         self.update()
 
     def onConstantLength2(self, *args):
-        """length1 の値を length2 に設定する"""
+        """絶対モードの幅を 幅1 で統一する"""
         length = cmds.floatField(self.field_length1, q=True, v=True)
         cmds.floatField(self.field_length2, e=True, v=length)
+        ui.set_value(self.cb_relative_mode, False)
         self.update()
 
     def onSetConst(self, *args):
         """等幅モードのチェックボックス変更ハンドラ"""
         constMode = cmds.checkBox(self.constMode, q=True, v=True)
+        
         if constMode:
             self.onConstantLength2()
             cmds.floatField(self.field_length2, e=True, en=False)
         else:
             cmds.floatField(self.field_length2, e=True, en=True)
+
+        ui.set_value(self.cb_relative_mode, False)
 
     def update(self, *args):
         """現在の設定で整列を実行する"""
@@ -230,37 +261,95 @@ class NN_AlignedgeRingWindow(object):
         if self.lastExecuted:
             self.lastExecuted()
 
-    def onRelativeDiff(self, *args):
-        current_acc_add = cmds.floatField(self.ff_acc_add, q=True, v=True)
-        cmds.floatField(self.ff_acc_add, e=True, v=current_acc_add - 0.1)
-        if self.lastExecutedMode:
-            self.alignEdgeRing(None, None, self.lastExecutedMode, relativeMode=True)
+    def onRelativeDiff_1(self, *args):
+        """相対モードの加数を減らして実行"""
+        current_acc_add = ui.get_value(self.ff_acc_add)
+        ui.set_value(self.ff_acc_add, current_acc_add - 0.01)
+        ui.set_value(self.cb_relative_mode, True)
 
-    def onRelativeAdd(self, *args):
-        current_acc_add = cmds.floatField(self.ff_acc_add, q=True, v=True)
-        cmds.floatField(self.ff_acc_add, e=True, v=current_acc_add + 0.1)
         if self.lastExecutedMode:
-            self.alignEdgeRing(None, None, self.lastExecutedMode, relativeMode=True)
+            self.alignEdgeRing(length1=None, length2=None, alignMode=self.lastExecutedMode, relativeMode=True)
 
-    def onRelativeDiv(self, *args):
-        current_acc_mul = cmds.floatField(self.ff_acc_mul, q=True, v=True)
-        cmds.floatField(self.ff_acc_mul, e=True, v=current_acc_mul * 0.9)
-        if self.lastExecutedMode:
-            self.alignEdgeRing(None, None, self.lastExecutedMode, relativeMode=True)
+    def onRelativeDiff_10(self, *args):
+        """相対モードの加数を減らして実行"""
+        current_acc_add = ui.get_value(self.ff_acc_add)
+        ui.set_value(self.ff_acc_add, current_acc_add - 0.1)
+        ui.set_value(self.cb_relative_mode, True)
 
-    def onRelativeMul(self, *args):
-        current_acc_mul = cmds.floatField(self.ff_acc_mul, q=True, v=True)
-        cmds.floatField(self.ff_acc_mul, e=True, v=current_acc_mul * 1.1)
         if self.lastExecutedMode:
-            self.alignEdgeRing(None, None, self.lastExecutedMode, relativeMode=True)
+            self.alignEdgeRing(length1=None, length2=None, alignMode=self.lastExecutedMode, relativeMode=True)
+
+    def onRelativeAdd_1(self, *args):
+        """相対モードの加数を増やして実行"""
+        current_acc_add = ui.get_value(self.ff_acc_add)
+        ui.set_value(self.ff_acc_add, current_acc_add + 0.01)
+        ui.set_value(self.cb_relative_mode, True)
+
+        if self.lastExecutedMode:
+            self.alignEdgeRing(length1=None, length2=None, alignMode=self.lastExecutedMode, relativeMode=True)
+
+    def onRelativeAdd_10(self, *args):
+        """相対モードの加数を増やして実行"""
+        current_acc_add = ui.get_value(self.ff_acc_add)
+        ui.set_value(self.ff_acc_add, current_acc_add + 0.1)
+        ui.set_value(self.cb_relative_mode, True)
+
+        if self.lastExecutedMode:
+            self.alignEdgeRing(length1=None, length2=None, alignMode=self.lastExecutedMode, relativeMode=True)
+
+    def onRelativeDiv_99(self, *args):
+        """相対モードの乗数を減らして実行"""
+        current_acc_mul = ui.get_value(self.ff_acc_mul)
+        ui.set_value(self.ff_acc_mul, current_acc_mul * 0.99)
+        ui.set_value(self.cb_relative_mode, True)
+
+        if self.lastExecutedMode:
+            self.alignEdgeRing(length1=None, length2=None, alignMode=self.lastExecutedMode, relativeMode=True)
+
+    def onRelativeDiv_90(self, *args):
+        """相対モードの乗数を減らして実行"""
+        current_acc_mul = ui.get_value(self.ff_acc_mul)
+        ui.set_value(self.ff_acc_mul, current_acc_mul * 0.9)
+        ui.set_value(self.cb_relative_mode, True)
+
+        if self.lastExecutedMode:
+            self.alignEdgeRing(length1=None, length2=None, alignMode=self.lastExecutedMode, relativeMode=True)
+
+    def onRelativeMul_1(self, *args):
+        """相対モードの乗数を減らして実行"""
+        current_acc_mul = ui.get_value(self.ff_acc_mul)
+        ui.set_value(self.ff_acc_mul, current_acc_mul * 1.01)
+        ui.set_value(self.cb_relative_mode, True)
+
+        if self.lastExecutedMode:
+            self.alignEdgeRing(length1=None, length2=None, alignMode=self.lastExecutedMode, relativeMode=True)
+
+    def onRelativeMul_10(self, *args):
+        """相対モードの乗数を減らして実行"""
+        current_acc_mul = ui.get_value(self.ff_acc_mul)
+        ui.set_value(self.ff_acc_mul, current_acc_mul * 1.1)
+        ui.set_value(self.cb_relative_mode, True)
+
+        if self.lastExecutedMode:
+            self.alignEdgeRing(length1=None, length2=None, alignMode=self.lastExecutedMode, relativeMode=True)
 
     def onRelativeAlign(self, *args):
+        """相対モードのチェックボックス変更"""
+        pass
+        #if self.lastExecutedMode:
+        #    self.alignEdgeRing(length1=None, length2=None, alignMode=self.lastExecutedMode, relativeMode=True)
+
+    def onAlignRelative(self, *args):
         if self.lastExecutedMode:
-            self.alignEdgeRing(None, None, self.lastExecutedMode, relativeMode=True)
+            self.alignEdgeRing(length1=None, length2=None, alignMode=self.lastExecutedMode, relativeMode=True)
 
     def onResetAccumulation(self, *args):
         cmds.floatField(self.ff_acc_add, e=True, v=0)
         cmds.floatField(self.ff_acc_mul, e=True, v=1)
+
+        if self.lastExecutedMode:
+            self.alignEdgeRing(length1=None, length2=None, alignMode=self.lastExecutedMode, relativeMode=True)
+
 
     def onSetLengthFromFirstEdge(self, *args):
         """
@@ -372,9 +461,11 @@ class NN_AlignedgeRingWindow(object):
         # self.update()
 
 
-    # 選択しているエッジの長さで length フィールドを変更
-    # 選択されたエッジの長さの最頻値を使用する
     def onSetLengthFromMode(self, *args):
+        """
+        選択しているエッジの長さで length フィールドを変更
+        選択されたエッジの長さの最頻値を使用する
+        """
         selEdges = cmds.ls(os=True, fl=True)
         edgeCount = len(selEdges)
         dictLengthToCount = {}
@@ -401,9 +492,11 @@ class NN_AlignedgeRingWindow(object):
                 print("同じ長さのエッジがない")
         # self.update()
 
-    # 選択しているエッジの長さで length フィールドを変更
-    # 複数選択されていた場合は全ての長さの和を使用する
     def onSetLengthFromEdgePath(self, *args):
+        """
+        選択しているエッジの長さで length フィールドを変更
+        複数選択されていた場合は全ての長さの和を使用する
+        """
         selEdges = cmds.ls(os=True, fl=True)
         newLength = 0
         for edge in selEdges:
@@ -420,12 +513,13 @@ class NN_AlignedgeRingWindow(object):
 
         # self.update()
 
-    # 実行
+    # アラインの実行
     def onAlignIn(self, *args):
         length1 = cmds.floatField(self.field_length1, q=True, v=True)
         length2 = cmds.floatField(self.field_length2, q=True, v=True)
         mode = self.AM_IN
-        self.alignEdgeRing(length1, length2, mode)
+        relative_mode = ui.get_value(self.cb_relative_mode)
+        self.alignEdgeRing(length1=length1, length2=length2, alignMode=mode, relativeMode=relative_mode)
         self.lastExecuted = self.onAlignIn
         self.lastExecutedMode = mode
 
@@ -433,7 +527,8 @@ class NN_AlignedgeRingWindow(object):
         length1 = cmds.floatField(self.field_length1, q=True, v=True)
         length2 = cmds.floatField(self.field_length2, q=True, v=True)
         mode = self.AM_OUT
-        self.alignEdgeRing(length1, length2, mode)
+        relative_mode = ui.get_value(self.cb_relative_mode)
+        self.alignEdgeRing(length1=length1, length2=length2, alignMode=mode, relativeMode=relative_mode)
         self.lastExecuted = self.onAlignOut
         self.lastExecutedMode = mode
 
@@ -441,7 +536,8 @@ class NN_AlignedgeRingWindow(object):
         length1 = cmds.floatField(self.field_length1, q=True, v=True)
         length2 = cmds.floatField(self.field_length2, q=True, v=True)
         mode = self.AM_CENTER
-        self.alignEdgeRing(length1, length2, mode)
+        relative_mode = ui.get_value(self.cb_relative_mode)
+        self.alignEdgeRing(length1=length1, length2=length2, alignMode=mode, relativeMode=relative_mode)
         self.lastExecuted = self.onAlignCenter
         self.lastExecutedMode = mode
 
@@ -459,6 +555,9 @@ class NN_AlignedgeRingWindow(object):
         printd("only set center")
         mode = self.AM_CENTER
         self.lastExecutedMode = mode
+
+    def onHiliteInner(self, *args):
+        pass
 
     # エッジの角度を前後を参照して平均化する
     def onSmoothAngle(self, *args):
